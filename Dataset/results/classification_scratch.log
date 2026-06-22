@@ -1,0 +1,27 @@
+Device: mps
+Watertank-Cropped: 10 classes | train=1654 val=355 test=355
+[resnet50_scratch] epoch 1/15 | train_loss 1.7428 acc 0.3966 | val_loss 6.5307 acc 0.1465
+[resnet50_scratch] epoch 2/15 | train_loss 1.1351 acc 0.5913 | val_loss 4.6100 acc 0.2000
+[resnet50_scratch] epoch 3/15 | train_loss 0.6616 acc 0.7872 | val_loss 0.8285 acc 0.6901
+[resnet50_scratch] epoch 4/15 | train_loss 0.3878 acc 0.8833 | val_loss 1.5072 acc 0.5380
+[resnet50_scratch] epoch 5/15 | train_loss 0.2339 acc 0.9365 | val_loss 0.6542 acc 0.7577
+[resnet50_scratch] epoch 6/15 | train_loss 0.1317 acc 0.9667 | val_loss 0.3504 acc 0.8845
+[resnet50_scratch] epoch 7/15 | train_loss 0.0955 acc 0.9734 | val_loss 0.2215 acc 0.9239
+[resnet50_scratch] epoch 8/15 | train_loss 0.0905 acc 0.9758 | val_loss 0.1344 acc 0.9577
+[resnet50_scratch] epoch 9/15 | train_loss 0.0550 acc 0.9855 | val_loss 0.0825 acc 0.9859
+[resnet50_scratch] epoch 10/15 | train_loss 0.0332 acc 0.9915 | val_loss 0.2149 acc 0.9239
+[resnet50_scratch] epoch 11/15 | train_loss 0.0736 acc 0.9794 | val_loss 0.1273 acc 0.9690
+[resnet50_scratch] epoch 12/15 | train_loss 0.0472 acc 0.9825 | val_loss 0.0371 acc 0.9915
+[resnet50_scratch] epoch 13/15 | train_loss 0.0288 acc 0.9909 | val_loss 0.0344 acc 0.9915
+[resnet50_scratch] epoch 14/15 | train_loss 0.0199 acc 0.9946 | val_loss 0.0363 acc 0.9859
+[resnet50_scratch] epoch 15/15 | train_loss 0.0121 acc 0.9976 | val_loss 0.0249 acc 0.9859
+[resnet50_scratch] FINAL test_acc=0.9859  (best_val_acc=0.9915, 15.9 min)
+
+Saved comparison chart: results/figures/classification_baseline_vs_transfer.png
+Saved run log: results/classification/classification_runs.json
+
+Summary:
+  baseline_cnn                        test_acc=76.06%  (2.7 min)
+  resnet50_scratch                    test_acc=98.59%  (15.9 min)
+  resnet50_turntable_pretrain         test_acc=86.39%  (18.4 min)
+  resnet50_transfer                   test_acc=43.66%  (0.7 min)

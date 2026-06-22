@@ -1,0 +1,13 @@
+.DS_Store
+**/__pycache__/
+*.pyc
+.claude/
+
+# Raw dataset — large, externally downloadable via Dataset/download_datasets.py
+Dataset/marine-debris-fls-datasets/
+
+# Derived/converted images — regenerable from the raw dataset + conversion scripts
+Dataset/results/yolo_dataset/
+
+# Redundant cached pretrained-COCO download (ultralytics re-downloads automatically)
+Dataset/yolov8m.pt

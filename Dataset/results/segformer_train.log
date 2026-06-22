@@ -1,0 +1,145 @@
+[segformer_mps_patch] Patched: SegformerAttention, DepthWiseConv, MLP, DecodeHead (transpose → .contiguous().reshape() to fix MPS backward view crash)
+Device: mps
+Dataset: train=1306, val=281, test=281
+Weighted sampler built.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] You passed `num_labels=12` which is incompatible to the `id2label` map of length `150`.
+Loading weights:   0%|          | 0/380 [00:00<?, ?it/s]Loading weights: 100%|██████████| 380/380 [00:00<00:00, 22211.88it/s]
+[transformers] [1mSegformerForSemanticSegmentation LOAD REPORT[0m from: nvidia/segformer-b2-finetuned-ade-512-512
+Key                           | Status   |                                                                                                      
+------------------------------+----------+------------------------------------------------------------------------------------------------------
+decode_head.classifier.bias   | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([150]) vs model:torch.Size([12])                      
+decode_head.classifier.weight | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([150, 768, 1, 1]) vs model:torch.Size([12, 768, 1, 1])
+
+Notes:
+- MISMATCH:	ckpt weights were loaded, but they did not match the original empty weight shapes.
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x4e65ddcf0>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x3212258e0>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x4e61dabf0>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x4e4359110>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x322e38540>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x4e4380b60>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x45d4d34b0>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Internal Error (00000001:Internal Error)
+	<AGXG16GFamilyCommandBuffer: 0x45d404080>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1359e3400>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1118dfa00>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1359e3400>
+            name = Apple M4 
+    retainedReferences = 1
+PYTORCH_ENABLE_MPS_FALLBACK=1: No such file or directory
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[transformers] You passed `num_labels=12` which is incompatible to the `id2label` map of length `150`.
+[segformer_mps_patch] Patched: SegformerAttention, DepthWiseConv, MLP, DecodeHead (transpose → .contiguous().reshape() to fix MPS backward view crash)
+Device: mps
+Dataset: train=1306, val=281, test=281
+Weighted sampler built.
+Loading weights:   0%|          | 0/380 [00:00<?, ?it/s]Loading weights: 100%|██████████| 380/380 [00:00<00:00, 29734.07it/s]
+[transformers] [1mSegformerForSemanticSegmentation LOAD REPORT[0m from: nvidia/segformer-b2-finetuned-ade-512-512
+Key                           | Status   |                                                                                                      
+------------------------------+----------+------------------------------------------------------------------------------------------------------
+decode_head.classifier.weight | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([150, 768, 1, 1]) vs model:torch.Size([12, 768, 1, 1])
+decode_head.classifier.bias   | MISMATCH | Reinit due to size mismatch - ckpt: torch.Size([150]) vs model:torch.Size([12])                      
+
+Notes:
+- MISMATCH:	ckpt weights were loaded, but they did not match the original empty weight shapes.
+/Users/tolgaozcan/miniconda3/envs/marine-debris/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

@@ -1,0 +1,45 @@
+# YOLOv8 training config — TrashCan optical dataset
+path: ../data/trashcan
+train: images/train
+val: images/val
+test: images/test
+
+nc: 3
+names: ["trash", "bio", "rov"]
+
+# Training hyperparameters
+model: yolov8m.pt
+epochs: 100
+imgsz: 640
+batch: 16
+lr0: 0.01
+lrf: 0.01
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 3
+warmup_momentum: 0.8
+warmup_bias_lr: 0.1
+box: 7.5
+cls: 0.5
+dfl: 1.5
+
+# Augmentation
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.4
+degrees: 10.0
+translate: 0.1
+scale: 0.5
+shear: 2.0
+perspective: 0.0
+flipud: 0.1
+fliplr: 0.5
+mosaic: 1.0
+mixup: 0.1
+copy_paste: 0.0
+
+# Focal loss (handled via custom train.py — set fl_gamma in ultralytics)
+fl_gamma: 2.0
+
+# Class weights to handle imbalance (trash dominant)
+# Applied via custom weighted sampler in datasets.py

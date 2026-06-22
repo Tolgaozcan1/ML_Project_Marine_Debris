@@ -1,0 +1,16 @@
+names:
+- bottle
+- can
+- chain
+- drink-carton
+- hook
+- propeller
+- shampoo-bottle
+- standing-bottle
+- tire
+- valve
+nc: 10
+path: /kaggle/input/datasets/tolgaozcan/marine-debris-dts/results/yolo_dataset
+test: /kaggle/input/datasets/tolgaozcan/marine-debris-dts/results/yolo_dataset/test/images
+train: /kaggle/input/datasets/tolgaozcan/marine-debris-dts/results/yolo_dataset/train/images
+val: /kaggle/input/datasets/tolgaozcan/marine-debris-dts/results/yolo_dataset/val/images

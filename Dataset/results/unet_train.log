@@ -1,0 +1,8 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Device: mps
+Dataset: train=1306, val=281, test=281
+Model: U-Net + ResNet34  params=24,437,964
+Epoch   1/60 | loss 0.3986 | 3.2min
+Epoch   2/60 | loss 0.3209 | 3.2min
+Epoch   3/60 | loss 0.2699 | 3.0min
+Epoch   4/60 | loss 0.2119 | 3.2min

@@ -1,0 +1,22 @@
+Device: mps
+Watertank-Cropped: 10 classes | train=1654 val=355 test=355
+[resnet50_transfer] epoch 1/10 | train_loss 1.4957 acc 0.5828 | val_loss 0.6480 acc 0.8000
+[resnet50_transfer] epoch 2/10 | train_loss 0.3621 acc 0.9093 | val_loss 0.2588 acc 0.9465
+[resnet50_transfer] epoch 3/10 | train_loss 0.1552 acc 0.9674 | val_loss 0.1766 acc 0.9549
+[resnet50_transfer] epoch 4/10 | train_loss 0.0881 acc 0.9885 | val_loss 0.1237 acc 0.9775
+[resnet50_transfer] epoch 5/10 | train_loss 0.0554 acc 0.9927 | val_loss 0.1043 acc 0.9690
+[resnet50_transfer] epoch 6/10 | train_loss 0.0332 acc 0.9970 | val_loss 0.0743 acc 0.9803
+[resnet50_transfer] epoch 7/10 | train_loss 0.0293 acc 0.9952 | val_loss 0.0698 acc 0.9887
+[resnet50_transfer] epoch 8/10 | train_loss 0.0299 acc 0.9958 | val_loss 0.0539 acc 0.9887
+[resnet50_transfer] epoch 9/10 | train_loss 0.0186 acc 0.9982 | val_loss 0.0630 acc 0.9887
+[resnet50_transfer] epoch 10/10 | train_loss 0.0129 acc 0.9994 | val_loss 0.0429 acc 0.9915
+[resnet50_transfer] FINAL test_acc=0.9887  (best_val_acc=0.9915, 9.8 min)
+
+Saved comparison chart: results/figures/classification_baseline_vs_transfer.png
+Saved run log: results/classification/classification_runs.json
+
+Summary:
+  baseline_cnn                        test_acc=76.06%  (2.7 min)
+  resnet50_scratch                    test_acc=98.59%  (15.9 min)
+  resnet50_turntable_pretrain         test_acc=86.39%  (18.4 min)
+  resnet50_transfer                   test_acc=98.87%  (9.8 min)
