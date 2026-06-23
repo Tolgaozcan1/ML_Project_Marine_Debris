@@ -6,8 +6,11 @@
 # Raw dataset — large, externally downloadable via Dataset/download_datasets.py
 Dataset/marine-debris-fls-datasets/
 
-# Derived/converted images — regenerable from the raw dataset + conversion scripts
-Dataset/results/yolo_dataset/
+# Derived/converted images — regenerable from the raw dataset + conversion scripts.
+# Exception: test/ + dataset.yaml are kept — the presentation notebook loads them
+# directly for live detection evaluation and the code-demo cells.
+Dataset/results/yolo_dataset/train/
+Dataset/results/yolo_dataset/val/
 
 # Redundant cached pretrained-COCO downloads (ultralytics re-downloads automatically)
 Dataset/yolov8m.pt

@@ -1,0 +1,16 @@
+path: /Users/tolgaozcan/Desktop/ML-Project /Dataset/results/yolo_dataset
+train: train/images
+val:   val/images
+test:  test/images
+nc: 10
+names:
+  - bottle
+  - can
+  - chain
+  - drink-carton
+  - hook
+  - propeller
+  - shampoo-bottle
+  - standing-bottle
+  - tire
+  - valve
