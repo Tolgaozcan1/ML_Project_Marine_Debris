@@ -91,7 +91,7 @@ html = f"""<!DOCTYPE html>
 {td("Course", "Machine Learning — Summer 2026")}
 {td("Group", "8")}
 {td("Team members", "Tolga Ozcan (26576920), Venkatesh Ajay Vijaya Kumar (36379442), Deekshith Hunsur Shekar (62246101)")}
-{td("Report date", "23 June 2026")}
+{td("Report date", "24 June 2026")}
 {td("Deadline", "Sunday, 28 June 2026")}
 </table>
 </div>
@@ -192,10 +192,67 @@ errors.
 <h2>3.5 Local Backup</h2>
 <p>
 A git repository was initialized at the project root with the full codebase, checkpoints, figures,
-and logs committed locally (no remote push performed in this pass).
+and logs committed locally.
 </p>
 
-<h1 class="chapter">4. What Remains Open (Documented Limitations)</h1>
+<h1 class="chapter">4. Repository Curation Pass</h1>
+<p>
+The first remediation pass left a working but unwieldy repository: roughly 3,050 tracked files,
+almost all of them the individual classification images needed for the notebook's live
+re-evaluation cells, plus a number of internal planning/progress documents never meant to be part
+of a submission. A second pass curated this down to a separate, minimal folder
+(<code>ML_Project_Marine_Debris/</code>) built specifically around the question "what does a
+grader checking this against the course instructions actually need to see?"
+</p>
+<table>
+{th("", "Before", "After")}
+{td("Tracked files", "~3,050", "38")}
+{td("Repo size (working copy)", "~700&nbsp;MB", "~380&nbsp;MB")}
+{td("Largest single contributor", "2,364 individual classification images", "Bundled into 2 zip files")}
+</table>
+
+<h2>4.1 What Was Removed</h2>
+<p>
+Internal dev-notes (<code>CLAUDE.md</code>, <code>PROJECT_OVERVIEW.md</code>, <code>report.md</code>),
+the generic course instructions PDF (the grader already has their own copy), four superseded report
+drafts with stale numbers, two confirmed-unexecuted scratch notebooks, an unused/never-fine-tuned
+YOLO checkpoint, and several training-only intermediate artifacts not referenced by the final
+notebook. Nothing was deleted outright &mdash; the full development history remains in the original
+project folder as a local backup.
+</p>
+
+<h2>4.2 Two Real Bugs Found While Curating</h2>
+<p>
+Trimming the repository surfaced two genuine reproducibility gaps that a simple file count would
+have hidden:
+</p>
+<ul>
+<li><strong>Missing YOLO test split.</strong> <code>results/yolo_dataset/test/</code> and its
+<code>dataset.yaml</code> had never been tracked by git (excluded by a directory-level
+<code>.gitignore</code> rule from before they were ever added). On a fresh clone, the notebook's
+live detection-evaluation cell would fail with <code>FileNotFoundError</code>.</li>
+<li><strong>Missing classification images.</strong> The Results section re-evaluates the
+baseline/scratch/transfer checkpoints against real images via
+<code>FLSClassificationDataset</code>, not just the saved weights &mdash; the raw
+<code>watertank-cropped/</code> folder is a hard dependency, not an optional extra, and had been
+entirely excluded along with the rest of the (much larger) raw dataset.</li>
+</ul>
+<p>
+Both were fixed and verified with a true clean-room test: cloning the repository into a scratch
+directory with nothing pre-existing and nothing pre-unzipped, then executing the notebook from
+that clone. It produced zero error cells and the same results as every prior run.
+</p>
+
+<h2>4.3 Keeping the Repo Small Without Losing Reproducibility</h2>
+<p>
+Rather than choosing between "small repo" and "actually works when cloned," the two large
+image sets (2,364 classification images, 281 YOLO test images+labels) were bundled into single
+<code>.zip</code> files. A new setup cell at the top of the notebook checks whether each folder
+already exists and, if not, unzips the corresponding bundle automatically &mdash; so the file
+count stays low while a fresh clone still "just works" with no manual setup step.
+</p>
+
+<h1 class="chapter">5. What Remains Open (Documented Limitations)</h1>
 <table>
 {th("Limitation", "Why it was not fixed in this pass")}
 {td("Random, leakage-risk train/val/test splits", "The released dataset has no session/object ID in its filenames, so a true leakage-safe split is not cheaply derivable; fixing it would require re-running all three tasks")}
@@ -204,14 +261,15 @@ and logs committed locally (no remote push performed in this pass).
 {td("Optical/TrashCan multimodal fusion", "Was a stretch goal in the original project brainstorm, not part of the assigned core tasks; descoped to stay within the deadline")}
 </table>
 
-<h1 class="chapter">5. Outstanding Action Items</h1>
+<h1 class="chapter">6. Outstanding Action Items</h1>
 <table>
 {th("Item", "Owner")}
-{td('<span class="todo">Push the local git repo to GitHub (or Drive) for online backup</span>', "Tolga")}
+{td('<span class="todo">Delete and recreate the GitHub repo (empty), then push the curated ML_Project_Marine_Debris folder</span>', "Tolga")}
 {td('<span class="todo">Copy the project to Venkatesh and Deekshith laptops</span>', "Venkatesh / Deekshith")}
 {td('<span class="todo">All 3 members rehearse explaining the full workflow, splits, baselines, and limitations</span>', "All")}
 {td('<span class="todo">Bring charger and USB-C adapter; test the notebook opens on more than one laptop</span>', "All")}
 {td('<span class="done">Title slide matriculation numbers</span>', "Done — Tolga 26576920, Venkatesh 36379442, Deekshith 62246101")}
+{td('<span class="done">Repository curated to a minimal, gradable file set</span>', "Done — 38 files, clean-room verified")}
 </table>
 
 </body>

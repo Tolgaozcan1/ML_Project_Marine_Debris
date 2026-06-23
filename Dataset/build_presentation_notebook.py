@@ -24,6 +24,28 @@ def code(text):
 
 code("%matplotlib inline")
 
+code("""
+# Setup: bulky image sets ship as zips to keep the repo file count small.
+# Unzip each once on first run; subsequent runs are a no-op.
+import zipfile
+from pathlib import Path
+
+_BUNDLES = [
+    ("marine-debris-fls-datasets/md_fls_dataset/data/watertank-cropped",
+     "marine-debris-fls-datasets/md_fls_dataset/data/watertank-cropped.zip"),
+    ("results/yolo_dataset/test",
+     "results/yolo_dataset/test.zip"),
+]
+for folder, zip_path in _BUNDLES:
+    folder, zip_path = Path(folder), Path(zip_path)
+    if not folder.exists() and zip_path.exists():
+        print(f"Unzipping {zip_path} ...")
+        with zipfile.ZipFile(zip_path) as zf:
+            zf.extractall(zip_path.parent)
+    else:
+        print(f"{folder} already present, skipping unzip.")
+""")
+
 # ───────────────────────────────────────────────────────────────────────────
 # Title Slide
 # ───────────────────────────────────────────────────────────────────────────
