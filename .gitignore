@@ -3,8 +3,15 @@
 *.pyc
 .claude/
 
-# Raw dataset — large, externally downloadable via Dataset/download_datasets.py
-Dataset/marine-debris-fls-datasets/
+# Raw dataset — large, externally downloadable (see README). Exception:
+# watertank-cropped is kept — the presentation notebook loads it directly
+# for live classification evaluation and the code-demo cells.
+Dataset/marine-debris-fls-datasets/*
+!Dataset/marine-debris-fls-datasets/md_fls_dataset
+Dataset/marine-debris-fls-datasets/md_fls_dataset/*
+!Dataset/marine-debris-fls-datasets/md_fls_dataset/data
+Dataset/marine-debris-fls-datasets/md_fls_dataset/data/*
+!Dataset/marine-debris-fls-datasets/md_fls_dataset/data/watertank-cropped
 
 # Derived/converted images — regenerable from the raw dataset + conversion scripts.
 # Exception: test/ + dataset.yaml are kept — the presentation notebook loads them
