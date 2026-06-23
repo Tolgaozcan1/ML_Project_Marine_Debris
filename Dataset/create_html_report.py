@@ -327,11 +327,13 @@ def build_html():
 
   <table>
     <tr><th>Task</th><th>Model</th><th>Score</th></tr>
-    <tr><td>Classification (Watertank)</td><td>ResNet-50</td><td class="result-good">100.00% accuracy</td></tr>
-    <tr><td>Classification (Turntable)</td><td>ResNet-50</td><td class="result-good">99.19% accuracy</td></tr>
-    <tr><td>Object Detection</td><td>YOLOv8m</td><td class="result-good">mAP50 = 0.967</td></tr>
-    <tr><td>Segmentation (CNN)</td><td>U-Net + ResNet34</td><td>mIoU = 0.638</td></tr>
-    <tr><td>Segmentation (Transformer)</td><td>SegFormer-B2</td><td>mIoU = 0.658</td></tr>
+    <tr><td>Classification (baseline)</td><td>Simple CNN, scratch</td><td>76.06% test accuracy</td></tr>
+    <tr><td>Classification (Watertank)</td><td>ResNet-50, scratch</td><td class="result-good">98.59% test accuracy</td></tr>
+    <tr><td>Classification (cross-domain transfer)</td><td>ResNet-50, Turntable&rarr;Watertank</td><td class="result-good">98.87% test accuracy</td></tr>
+    <tr><td>Object Detection (baseline)</td><td>YOLOv8n</td><td>mAP50 = 0.927</td></tr>
+    <tr><td>Object Detection (main)</td><td>YOLOv8m</td><td class="result-good">mAP50 = 0.937</td></tr>
+    <tr><td>Segmentation (CNN)</td><td>U-Net + ResNet34</td><td>mIoU = 0.638 (documented, not independently reproducible &mdash; see &sect;5.6)</td></tr>
+    <tr><td>Segmentation (Transformer)</td><td>SegFormer-B2</td><td>mIoU = 0.658 (documented, not independently reproducible &mdash; see &sect;5.6)</td></tr>
   </table>
 </div>
 
@@ -340,14 +342,21 @@ def build_html():
 <div class="abstract">
   <strong>Abstract</strong>
   Marine debris poses significant ecological and navigational hazards in underwater environments.
-  This report presents a comprehensive deep learning pipeline for detecting, localising, and
-  classifying marine debris from Forward-Looking Sonar (FLS) imagery. We evaluate three
-  complementary tasks on the FLS Marine Debris Dataset: (1) image classification with ResNet-50,
-  (2) object detection with YOLOv8m, and (3) semantic segmentation with U-Net and SegFormer-B2.
-  Our detection model achieves mAP50&nbsp;=&nbsp;0.967, exceeding any published baseline.
-  Classification reaches near-perfect accuracy (100.00% and 99.19%).
-  Segmentation models achieve mIoU of 0.638 and 0.658, compared to the published baseline of 0.748.
-  All data were collected with an ARIS Explorer 3000 sonar at Heriot-Watt University.
+  This report presents a deep learning pipeline for detecting, localising, and classifying marine
+  debris from Forward-Looking Sonar (FLS) imagery. We evaluate three complementary tasks on the
+  FLS Marine Debris Dataset: (1) image classification with a simple-CNN baseline, a from-scratch
+  ResNet-50, and a cross-domain transfer variant (ResNet-50 pretrained on the Turntable domain,
+  fine-tuned on Watertank); (2) object detection with a YOLOv8n baseline and a YOLOv8m main model;
+  and (3) semantic segmentation with U-Net and SegFormer-B2. Every task includes a deliberately
+  simple baseline trained under the same protocol as its main model, and every classification/
+  detection number in this report is recomputed live from saved checkpoints rather than taken on
+  faith. The cross-domain transfer model matches the from-scratch model's accuracy (98.87% vs.
+  98.59%) while converging in roughly 40% less training time. Our main detection model achieves
+  mAP50&nbsp;=&nbsp;0.937, clearly ahead of its own baseline (0.927). Segmentation models achieve
+  mIoU of 0.638 and 0.658 against a published baseline of 0.748, though these particular numbers
+  are documented from training logs rather than independently re-verified in this report &mdash;
+  see the Limitations section for why. All data were collected with an ARIS Explorer 3000 sonar
+  at Heriot-Watt University.
 </div>
 
 
@@ -461,27 +470,45 @@ We address this with two techniques:
 <!-- ══ 3. METHODS ═══════════════════════════════════════════════ -->
 <h1 class="page-break">3. Methods</h1>
 
-<h2>3.1 Task 1 &mdash; Image Classification (ResNet-50)</h2>
+<h2>3.1 Task 1 &mdash; Image Classification</h2>
 
 <p>
-<strong>Architecture:</strong> ResNet-50 (He et al., 2016) pretrained on ImageNet-1k (1.28 million
-images, 1,000 classes). The final fully-connected layer is replaced with a new linear layer
-matching the number of target classes (10 or 18). All other layers are fine-tuned.
+<strong>Architectures:</strong> a deliberately simple 4-block CNN trained from scratch serves as
+the baseline. The main model is ResNet-50 (He et al., 2016), also trained <em>from scratch</em>
+(random initialisation) rather than from ImageNet weights &mdash; ImageNet features are tuned for
+natural RGB photographs, not grayscale acoustic sonar imagery, so they offer little benefit here.
+The final fully-connected layer is sized to the number of target classes (10 or 18).
 </p>
 
-{callout("What is transfer learning?",
-    "Instead of teaching the AI everything from zero, we start with a model that already knows "
-    "how to recognise shapes, edges, and textures from 1.28 million everyday photos. "
-    "We then re-train just the final layer so it outputs our debris class names instead of "
-    "ImageNet categories. This is like a doctor who already knows human biology learning "
-    "a new specialty &mdash; much faster than starting from medical school again.")}
+{callout("Why not just compare to the original checkpoint?",
+    "Earlier results for this dataset were produced by a training script that no longer exists "
+    "in the project history, and project documentation disagreed on whether those checkpoints "
+    "used ImageNet pretraining. Rather than restate an unverifiable claim, this report's "
+    "baseline, scratch, and transfer numbers all come from a single, current, seeded training "
+    "script, with results recomputed live against the saved checkpoints.")}
 
-<p><strong>Training configuration:</strong></p>
+<p><strong>Cross-domain transfer experiment.</strong> A third ResNet-50 is first trained on the
+Turntable-Cropped domain (18 classes, a different sonar rig/scene), then its backbone weights
+(every layer except the final classification head, since the class counts differ) are copied into
+a fresh ResNet-50 and fine-tuned on Watertank-Cropped. This is compared against the from-scratch
+Watertank model under the same seed and similar epoch budget, to test whether pretraining on a
+different sonar domain helps when the target domain has comparatively little data.</p>
+
+{callout("What is transfer learning?",
+    "Instead of teaching the AI everything from zero on the target dataset, we first let it learn "
+    "general sonar shapes and textures on a different but related dataset (Turntable), then "
+    "re-use most of what it learned and only adapt the final layers to the new target dataset "
+    "(Watertank). This is like a doctor trained in one hospital's equipment moving to another "
+    "hospital &mdash; most of their training transfers directly.")}
+
+<p><strong>Training configuration (all three models):</strong></p>
 <ul>
-  <li>Optimiser: AdamW, learning rate 3&times;10<sup>&minus;4</sup>, weight decay 10<sup>&minus;4</sup></li>
-  <li>LR schedule: Cosine annealing over 30 epochs (min LR = 10<sup>&minus;6</sup>)</li>
-  <li>Batch size: 32 &bull; Epochs: 30</li>
+  <li>Optimiser: AdamW &bull; Batch size: 32</li>
+  <li>Baseline CNN: learning rate 10<sup>&minus;3</sup>, 15 epochs</li>
+  <li>ResNet-50 from scratch: learning rate 10<sup>&minus;4</sup>, 15 epochs</li>
+  <li>ResNet-50 transfer (fine-tune stage): learning rate 3&times;10<sup>&minus;5</sup>, 10 epochs</li>
   <li>Loss: CrossEntropyLoss (WeightedRandomSampler corrects for class frequency)</li>
+  <li>Global random seed fixed (42) for reproducibility across all three runs</li>
   <li>Hardware: Apple M4 MPS backend (local)</li>
 </ul>
 
@@ -489,12 +516,14 @@ matching the number of target classes (10 or 18). All other layers are fine-tune
      "Figure 3. ResNet-50 classification accuracy during training. "
      "The model reaches near-perfect accuracy within 25 epochs on both datasets.")}
 
-<h2>3.2 Task 2 &mdash; Object Detection (YOLOv8m)</h2>
+<h2>3.2 Task 2 &mdash; Object Detection</h2>
 
 <p>
-<strong>Architecture:</strong> YOLOv8m (Jocher et al., 2023) &mdash; the medium variant with
-25.8&nbsp;million parameters. Pretrained on MS-COCO (330,000 images, 80 classes), then fine-tuned
-on our sonar detection dataset.
+<strong>Architectures:</strong> YOLOv8n (nano, 3.0&nbsp;million parameters) serves as the baseline,
+trained for 30 epochs. The main model is YOLOv8m (Jocher et al., 2023, medium variant,
+25.8&nbsp;million parameters), trained for 80 epochs. Both are pretrained on MS-COCO (330,000
+images, 80 classes), then fine-tuned on our sonar detection dataset &mdash; isolating model
+capacity as the difference between baseline and main model under an otherwise identical pipeline.
 </p>
 
 <p>
@@ -563,16 +592,24 @@ Input size: 512&times;512. Trained for 30 epochs on Kaggle T4 GPU.
 <h2>4.1 Classification Results</h2>
 
 <table>
-  {th("Model", "Dataset", "Classes", "Val Accuracy", "Test Accuracy")}
-  {td("ResNet-50", "Watertank-Cropped", "10", "<span class='result-good'>100.00%</span>", "<span class='result-good'>99.15%</span>")}
-  {td("ResNet-50", "Turntable-Cropped", "18", "<span class='result-good'>99.19%</span>", "<span class='result-good'>98.38%</span>")}
+  {th("Model", "Dataset", "Test Accuracy", "Training time")}
+  {td("Baseline CNN (scratch)", "Watertank-Cropped", "76.06%", "2.7 min")}
+  {td("ResNet-50 (scratch)", "Watertank-Cropped", "<span class='result-good'>98.59%</span>", "15.9 min")}
+  {td("ResNet-50 (Turntable&rarr;Watertank transfer)", "Watertank-Cropped", "<span class='result-good'>98.87%</span>", "9.8 min")}
+  {td("ResNet-50 (original checkpoint, earlier session)", "Watertank-Cropped", "99.15%", "undocumented")}
+  {td("ResNet-50 (original checkpoint, earlier session)", "Turntable-Cropped", "98.38%", "undocumented")}
 </table>
 
 <p>
-ResNet-50 achieves near-perfect accuracy on both sub-datasets. On Watertank (10 classes) the
-model made zero errors on the validation set. The slight drop on Turntable (18 classes) reflects
-the larger class space: 8 additional object types with some visual similarity to existing classes
-(e.g. bottle vs. shampoo-bottle) increase the difficulty.
+The baseline CNN, clearly weaker than either ResNet-50 variant, confirms the main model's accuracy
+gain is attributable to architecture rather than simply "a model was trained." The cross-domain
+transfer model matches the from-scratch model's accuracy while training in roughly 40% less time
+(9.8 vs. 15.9 minutes, 10 vs. 15 epochs) &mdash; evidence that pretraining on a related sonar
+domain (Turntable) transfers useful features to a target domain with comparatively little data
+(Watertank). All three of the new rows above are recomputed live from saved checkpoints in the
+accompanying notebook, with a fixed seed. The original checkpoints from an earlier session are
+listed for context, but the training script that produced them no longer exists in the project
+history, so their exact configuration (e.g. whether ImageNet pretraining was used) is undocumented.
 </p>
 
 {fig(FIGURES / "cls_watertank_confusion.png",
@@ -592,21 +629,30 @@ the larger class space: 8 additional object types with some visual similarity to
 <h2>4.2 Detection Results</h2>
 
 <table>
-  {th("Metric", "Value", "Explanation")}
-  {td("<strong>mAP50</strong>", "<span class='result-good'>0.967</span>", "Mean Average Precision at 50% IoU overlap threshold")}
-  {td("mAP50&ndash;95", "0.702", "Average over IoU thresholds from 50% to 95% (stricter)")}
-  {td("Precision", "0.935", "93.5% of detected boxes correspond to real objects")}
-  {td("Recall", "0.959", "95.9% of all real objects were successfully detected")}
-  {td("Training time", "1.072 hrs", "80 epochs on NVIDIA T4 GPU (Kaggle)")}
+  {th("Model", "mAP50", "mAP50&ndash;95", "Role")}
+  {td("YOLOv8n", "0.927", "0.680", "Baseline &mdash; fewer parameters, same pipeline")}
+  {td("<strong>YOLOv8m</strong>", "<span class='result-good'>0.937</span>", "<span class='result-good'>0.697</span>", "Main model")}
 </table>
 
 <p>
-These results exceed any published detection benchmark for this dataset. The single most
-challenging class is <em>can</em> (mAP50&nbsp;=&nbsp;0.891), likely due to its small size and
-cylindrical shape which overlaps visually with <em>valve</em> and <em>shampoo-bottle</em>.
+Both numbers above are recomputed live via <code>ultralytics</code>'s own <code>.val()</code> on
+the held-out test split, directly from the saved checkpoints &mdash; not taken from a training-time
+log. (An earlier version of this project's visualisation/evaluation code pointed at a generic,
+never-fine-tuned COCO-pretrained YOLOv8m checkpoint by mistake, which produced a near-zero score;
+this was found and corrected before the numbers above were computed.) The main model improves on
+its own baseline by a modest but consistent margin on both metrics, isolating the effect of model
+capacity (3.0M vs. 25.8M parameters) under an otherwise identical training pipeline. The single
+most challenging class for both models is <em>can</em>, likely due to its small size and
+cylindrical shape, which overlaps visually with <em>valve</em> and <em>shampoo-bottle</em>.
 </p>
 
-<h3>Per-Class Detection Performance</h3>
+<h3>Per-Class Detection Performance (YOLOv8m)</h3>
+<p>
+The per-class breakdown below is from the original training-time validation log (overall
+mAP50&nbsp;=&nbsp;0.967 in that run) and has not been individually recomputed per class in this
+pass &mdash; only the aggregate mAP50/mAP50&ndash;95 figures in the table above were
+independently re-verified live.
+</p>
 
 <table>
   {th("Class", "mAP50", "mAP50&ndash;95", "Test instances")}
@@ -667,10 +713,24 @@ of 0.748; reasons are analysed in Section&nbsp;5.
 <h2>5.1 Why Classification Achieved Near-Perfect Accuracy</h2>
 <p>
 The cropped patch datasets present the debris object centred in the frame with minimal
-background clutter. ResNet-50 with ImageNet pretraining generalises effectively because sonar
-images contain distinctive acoustic shadow patterns that are highly class-discriminative,
+background clutter. ResNet-50 generalises effectively even when trained from scratch because
+sonar images contain distinctive acoustic shadow patterns that are highly class-discriminative,
 even without colour information. The task is also inherently simpler than detection or
-segmentation: a single label is assigned per image rather than per region or per pixel.
+segmentation: a single label is assigned per image rather than per region or per pixel. The
+baseline CNN (76.06%) reaching far below either ResNet-50 variant on the identical task and data
+confirms this isn't simply an easy dataset inflating every model's score &mdash; architecture and
+capacity still matter.
+</p>
+
+<h2>5.1b Why the Cross-Domain Transfer Model Matches the Scratch Model Faster</h2>
+<p>
+Turntable-Cropped and Watertank-Cropped share the same sensor (ARIS Explorer 3000) and broadly
+similar acoustic shadow characteristics, even though the recording rig and object set differ.
+Pretraining on Turntable lets the backbone learn generally useful sonar features &mdash; edges,
+shadow gradients, acoustic speckle patterns &mdash; before ever seeing a Watertank image, so
+fine-tuning only needs to adapt the decision boundary to the new class set rather than learn
+sonar feature extraction from zero. This is consistent with the transfer model needing only 10
+epochs to match what the from-scratch model needed 15 epochs to reach.
 </p>
 
 <h2>5.2 Why Detection Exceeded Published Research</h2>
@@ -717,36 +777,68 @@ that transformer-based attention is beneficial for this task.
   {td("Output", "Class label", "Boxes + class", "Pixel mask", "Pixel mask")}
   {td("Inference speed", "Very fast", "Real-time", "Medium", "Slow")}
   {td("Localisation", "None", "Bounding box", "Pixel-exact", "Pixel-exact")}
-  {td("Our accuracy", "99&ndash;100%", "mAP50 = 0.967", "mIoU = 0.638", "mIoU = 0.658")}
+  {td("Our accuracy", "98&ndash;99%", "mAP50 = 0.937", "mIoU = 0.638", "mIoU = 0.658")}
   {td("Recommended for", "Pre-screening", "Main pipeline", "Detailed mapping", "Post-dive analysis")}
 </table>
 <p>
 For a real-time AUV application, <strong>YOLOv8m is the recommended primary model</strong>:
-it provides localisation, runs in real-time, and achieves mAP50&nbsp;=&nbsp;0.967.
+it provides localisation, runs in real-time, and achieves mAP50&nbsp;=&nbsp;0.937.
 Classification (ResNet-50) can serve as a fast pre-filter. Segmentation models are better
 suited to post-dive analysis where processing time is not a constraint.
 </p>
+
+<h2>5.6 Limitations</h2>
+<p>This project's scope was deliberately bounded given the course deadline. The following
+limitations are acknowledged rather than fixed:</p>
+<ul>
+  <li><strong>Leakage-risk splits.</strong> All three tasks use a stratified <em>random</em>
+  train/val/test split at the image level. The released dataset encodes no session/object ID in
+  its filenames (e.g. <code>can-212.png</code>), so a true leakage-safe split &mdash; grouping all
+  frames of the same physical object/recording session together &mdash; is not cheaply derivable
+  from this dataset release. This is a known risk, not something verified absent.</li>
+  <li><strong>Segmentation weights are not independently reproducible.</strong> No checkpoint
+  survives for either U-Net or SegFormer-B2 (lost when the Kaggle free-tier session expired). The
+  local training log for U-Net only records 4 of the claimed 60 epochs; the local SegFormer log
+  only shows an Apple Silicon Metal crash, since that model was actually trained on Kaggle, whose
+  log was not saved locally. The mIoU figures reported here are documented, not re-verified.</li>
+  <li><strong>No segmentation baseline.</strong> Unlike classification and detection, no simple
+  baseline model was trained for segmentation, for the same reason as above.</li>
+  <li><strong>Optical/multimodal fusion was descoped.</strong> An early project brainstorm
+  considered fusing optical (TrashCan dataset) and sonar imagery. This was not pursued given the
+  time available; the cross-domain transfer experiment in this report stays within the sonar
+  modality (Turntable&nbsp;&rarr;&nbsp;Watertank).</li>
+</ul>
 
 
 <!-- ══ 6. CONCLUSION ════════════════════════════════════════════ -->
 <h1 class="page-break">6. Conclusion</h1>
 
 <p>
-This project demonstrates that deep learning achieves high-accuracy marine debris detection
-from Forward-Looking Sonar imagery across three complementary tasks:
+This project demonstrates that deep learning achieves marine debris detection well above a
+simple baseline from Forward-Looking Sonar imagery, across complementary tasks:
 </p>
 <ul>
-  <li><strong>Classification</strong> with ResNet-50 achieves &ge;99% accuracy, confirming that sonar patches contain sufficient discriminative information for reliable type identification.</li>
-  <li><strong>Detection</strong> with YOLOv8m achieves mAP50&nbsp;=&nbsp;0.967 &mdash; the strongest result reported for this dataset &mdash; within 1.07 hours of GPU training.</li>
-  <li><strong>Segmentation</strong> with SegFormer-B2 (mIoU&nbsp;=&nbsp;0.658) outperforms U-Net (mIoU&nbsp;=&nbsp;0.638), demonstrating that transformer attention benefits sonar scene understanding.</li>
+  <li><strong>Classification</strong> with ResNet-50 reaches 98.59% test accuracy from scratch,
+  clearly ahead of a simple-CNN baseline (76.06%) trained under the same protocol.</li>
+  <li><strong>Cross-domain transfer</strong> (Turntable&nbsp;&rarr;&nbsp;Watertank) matches the
+  from-scratch model's accuracy (98.87% vs. 98.59%) while converging in roughly 40% less training
+  time &mdash; a direct, reproducible answer to whether sonar-domain pretraining helps when
+  target-domain data is limited.</li>
+  <li><strong>Detection</strong> with YOLOv8m achieves mAP50&nbsp;=&nbsp;0.937, ahead of its own
+  YOLOv8n baseline (0.927) under an otherwise identical pipeline.</li>
+  <li><strong>Segmentation</strong> with SegFormer-B2 (mIoU&nbsp;=&nbsp;0.658) outperforms U-Net
+  (mIoU&nbsp;=&nbsp;0.638) in the original training logs, though neither result was independently
+  re-verified in this pass (see Limitations).</li>
 </ul>
 
 <p>
 The results validate the feasibility of equipping AUVs with AI-powered sonar processing for
-autonomous debris detection and mapping. Future work should explore: (1) higher-resolution
-segmentation training on the full Kaggle GPU budget; (2) cross-domain generalisation from the
-watertank to the flooded quarry scenario; and (3) fusion of detection and segmentation outputs
-for richer, multi-modal debris maps.
+autonomous debris detection and mapping, and show that even a modest amount of cross-domain
+sonar data can meaningfully accelerate training on a new target domain. Future work should
+explore: (1) a true leakage-safe, session-grouped split if session metadata becomes available;
+(2) retraining segmentation with full logs and preserved weights; (3) higher-resolution
+segmentation training on the full Kaggle GPU budget; and (4) extending the cross-domain transfer
+idea to optical&ndash;sonar fusion.
 </p>
 
 
