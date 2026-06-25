@@ -33,6 +33,8 @@ from pathlib import Path
 _BUNDLES = [
     ("marine-debris-fls-datasets/md_fls_dataset/data/watertank-cropped",
      "marine-debris-fls-datasets/md_fls_dataset/data/watertank-cropped.zip"),
+    ("marine-debris-fls-datasets/md_fls_dataset/data/turntable-cropped",
+     "marine-debris-fls-datasets/md_fls_dataset/data/turntable-cropped.zip"),
     ("results/yolo_dataset/test",
      "results/yolo_dataset/test.zip"),
 ]
