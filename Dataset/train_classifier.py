@@ -137,6 +137,12 @@ def main():
     parser.add_argument("--epochs_transfer", type=int, default=10)
     parser.add_argument("--stage", choices=["baseline", "scratch", "pretrain", "transfer", "all"],
                          default="all", help="Run a single stage (resume-friendly) or all stages")
+    parser.add_argument("--leakage_safe", action="store_true",
+                         help="Use the approximate object/session-grouped block split "
+                              "(src.datasets split_strategy='blocked') instead of the random "
+                              "image-level split, to bound the leakage risk in the random split. "
+                              "Writes to separate checkpoint files and run-log keys so the "
+                              "random-split numbers are preserved for side-by-side comparison.")
     args = parser.parse_args()
 
     set_seed(SEED)
@@ -145,11 +151,14 @@ def main():
     device = get_device()
     print(f"Device: {device}")
 
-    wt_train = FLSClassificationDataset(WATERTANK, split="train", seed=SEED)
-    wt_val = FLSClassificationDataset(WATERTANK, split="val", seed=SEED)
-    wt_test = FLSClassificationDataset(WATERTANK, split="test", seed=SEED)
+    split_strategy = "blocked" if args.leakage_safe else "random"
+    suffix = "_blocked" if args.leakage_safe else ""
+
+    wt_train = FLSClassificationDataset(WATERTANK, split="train", seed=SEED, split_strategy=split_strategy)
+    wt_val = FLSClassificationDataset(WATERTANK, split="val", seed=SEED, split_strategy=split_strategy)
+    wt_test = FLSClassificationDataset(WATERTANK, split="test", seed=SEED, split_strategy=split_strategy)
     n_watertank_cls = len(wt_train.classes)
-    print(f"Watertank-Cropped: {n_watertank_cls} classes | "
+    print(f"Watertank-Cropped ({split_strategy} split): {n_watertank_cls} classes | "
           f"train={len(wt_train)} val={len(wt_val)} test={len(wt_test)}", flush=True)
 
     runs_path = RESULTS_DIR / "classification_runs.json"
@@ -161,9 +170,9 @@ def main():
         set_seed(SEED)
         baseline = SimpleCNN(n_watertank_cls)
         baseline, info = train_model(baseline, wt_train, wt_val, wt_test, device,
-                                      epochs=args.epochs_baseline, lr=1e-3, tag="baseline_cnn")
-        torch.save(baseline.state_dict(), RESULTS_DIR / "cls_baseline_cnn.pt")
-        runs["baseline_cnn"] = info
+                                      epochs=args.epochs_baseline, lr=1e-3, tag=f"baseline_cnn{suffix}")
+        torch.save(baseline.state_dict(), RESULTS_DIR / f"cls_baseline_cnn{suffix}.pt")
+        runs[f"baseline_cnn{suffix}"] = info
         json.dump(runs, open(runs_path, "w"), indent=2)
 
     # 2. Main model, from scratch: ResNet-50 on Watertank-Cropped
@@ -171,27 +180,27 @@ def main():
         set_seed(SEED)
         scratch = make_resnet50(n_watertank_cls)
         scratch, info = train_model(scratch, wt_train, wt_val, wt_test, device,
-                                     epochs=args.epochs_scratch, lr=1e-4, tag="resnet50_scratch")
-        torch.save(scratch.state_dict(), RESULTS_DIR / "cls_watertank_resnet50_scratch.pt")
-        runs["resnet50_scratch"] = info
+                                     epochs=args.epochs_scratch, lr=1e-4, tag=f"resnet50_scratch{suffix}")
+        torch.save(scratch.state_dict(), RESULTS_DIR / f"cls_watertank_resnet50_scratch{suffix}.pt")
+        runs[f"resnet50_scratch{suffix}"] = info
         json.dump(runs, open(runs_path, "w"), indent=2)
 
     # 3. Task C pt.1 — pretrain ResNet-50 on Turntable-Cropped
     if stage in ("pretrain", "all"):
-        tt_train = FLSClassificationDataset(TURNTABLE, split="train", seed=SEED)
-        tt_val = FLSClassificationDataset(TURNTABLE, split="val", seed=SEED)
-        tt_test = FLSClassificationDataset(TURNTABLE, split="test", seed=SEED)
+        tt_train = FLSClassificationDataset(TURNTABLE, split="train", seed=SEED, split_strategy=split_strategy)
+        tt_val = FLSClassificationDataset(TURNTABLE, split="val", seed=SEED, split_strategy=split_strategy)
+        tt_test = FLSClassificationDataset(TURNTABLE, split="test", seed=SEED, split_strategy=split_strategy)
         n_turntable_cls = len(tt_train.classes)
-        print(f"Turntable-Cropped: {n_turntable_cls} classes | "
+        print(f"Turntable-Cropped ({split_strategy} split): {n_turntable_cls} classes | "
               f"train={len(tt_train)} val={len(tt_val)} test={len(tt_test)}", flush=True)
 
         set_seed(SEED)
         pretrain_model = make_resnet50(n_turntable_cls)
         pretrain_model, pretrain_info = train_model(
             pretrain_model, tt_train, tt_val, tt_test, device,
-            epochs=args.epochs_pretrain, lr=1e-4, tag="resnet50_turntable_pretrain")
-        torch.save(pretrain_model.state_dict(), RESULTS_DIR / "cls_turntable_resnet50_pretrain.pt")
-        runs["resnet50_turntable_pretrain"] = pretrain_info
+            epochs=args.epochs_pretrain, lr=1e-4, tag=f"resnet50_turntable_pretrain{suffix}")
+        torch.save(pretrain_model.state_dict(), RESULTS_DIR / f"cls_turntable_resnet50_pretrain{suffix}.pt")
+        runs[f"resnet50_turntable_pretrain{suffix}"] = pretrain_info
         json.dump(runs, open(runs_path, "w"), indent=2)
 
     # 3. Task C pt.2 — transfer pretrained backbone, finetune on Watertank-Cropped
@@ -199,7 +208,7 @@ def main():
         n_turntable_cls = 18  # fixed by dataset (see Dataset section)
         pretrain_model = make_resnet50(n_turntable_cls)
         pretrain_model.load_state_dict(
-            torch.load(RESULTS_DIR / "cls_turntable_resnet50_pretrain.pt", map_location="cpu"))
+            torch.load(RESULTS_DIR / f"cls_turntable_resnet50_pretrain{suffix}.pt", map_location="cpu"))
 
         set_seed(SEED)
         transfer_model = make_resnet50(n_watertank_cls)
@@ -212,10 +221,16 @@ def main():
 
         transfer_model, transfer_info = train_model(
             transfer_model, wt_train, wt_val, wt_test, device,
-            epochs=args.epochs_transfer, lr=3e-5, tag="resnet50_transfer")
-        torch.save(transfer_model.state_dict(), RESULTS_DIR / "cls_watertank_resnet50_transfer.pt")
-        runs["resnet50_transfer"] = transfer_info
+            epochs=args.epochs_transfer, lr=3e-5, tag=f"resnet50_transfer{suffix}")
+        torch.save(transfer_model.state_dict(), RESULTS_DIR / f"cls_watertank_resnet50_transfer{suffix}.pt")
+        runs[f"resnet50_transfer{suffix}"] = transfer_info
         json.dump(runs, open(runs_path, "w"), indent=2)
+
+    if args.leakage_safe:
+        print("\nLeakage-safe (blocked-split) run complete. Skipping the random-split "
+              "comparison chart — see classification_runs.json for the new "
+              f"*{suffix} entries.")
+        return
 
     if not all(k in runs for k in ("baseline_cnn", "resnet50_scratch", "resnet50_transfer")):
         print("\nNot all stages complete yet — skipping comparison chart. "

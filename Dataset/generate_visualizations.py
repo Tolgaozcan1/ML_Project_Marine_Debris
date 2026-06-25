@@ -192,10 +192,20 @@ else:
 # ─────────────────────────────────────────────────────────────────
 print("\n[3/4] YOLO detection visualizations...")
 
-classes = ["bottle", "can", "chain", "drink-carton", "hook",
-           "propeller", "shampoo-bottle", "standing-bottle", "tire", "valve"]
-map50 = [0.968, 0.891, 0.964, 0.984, 0.995, 0.975, 0.995, 0.995, 0.989, 0.914]
-map50_95 = [0.753, 0.535, 0.704, 0.663, 0.737, 0.669, 0.695, 0.727, 0.852, 0.689]
+# Per-class AP is recomputed live from the same .val() call that produces the
+# aggregate mAP50=0.937 reported elsewhere, instead of reusing the old
+# training-time log (mAP50=0.967 in that run) which the report no longer cites.
+import warnings as _warnings; _warnings.filterwarnings("ignore")
+from ultralytics import YOLO as _YOLO
+_yolo_pc = _YOLO(str(YOLO_WEIGHTS))
+_m_pc = _yolo_pc.val(data="results/yolo_dataset/dataset.yaml", split="test",
+                      imgsz=640, batch=8, verbose=False)
+_names = _yolo_pc.names
+_order = list(_m_pc.box.ap_class_index)
+_pairs = sorted(zip(_order, _m_pc.box.ap50, _m_pc.box.maps), key=lambda t: -t[1])
+classes = [_names[i] for i, _, _ in _pairs]
+map50 = [round(float(v), 3) for _, v, _ in _pairs]
+map50_95 = [round(float(v), 3) for _, _, v in _pairs]
 
 x = np.arange(len(classes))
 fig, ax = plt.subplots(figsize=(13, 5))
@@ -256,19 +266,30 @@ else:
 # ─────────────────────────────────────────────────────────────────
 print("\n[4/4] Summary results figure...")
 
-fig, ax = plt.subplots(figsize=(11, 5))
+fig, ax = plt.subplots(figsize=(13, 5.5))
 ax.axis("off")
 
+# All numbers below are recomputed live from saved checkpoints (classification:
+# results/classification/classification_runs.json; detection: the .val() call above)
+# rather than hardcoded — this table previously went stale relative to the rest
+# of the report (100.00%/99.19%/0.967) and that mismatch was caught in review.
+import json as _json
+_runs_path = Path("results/classification/classification_runs.json")
+_runs = _json.load(open(_runs_path)) if _runs_path.exists() else {}
+def _acc(key):
+    return f"{_runs[key]['test_acc']*100:.2f}%" if key in _runs else "n/a"
+
 table_data = [
-    ["ResNet-50 Classification", "Watertank-Cropped (10 cls)", "Top-1 Acc", "100.00%", "—"],
-    ["ResNet-50 Classification", "Turntable-Cropped (18 cls)", "Top-1 Acc", "99.19%",  "—"],
-    ["YOLOv8m Detection",        "Watertank-Seg",              "mAP50",     "0.967",   "—"],
-    ["YOLOv8m Detection",        "Watertank-Seg",              "mAP50-95",  "0.702",   "—"],
-    ["U-Net + ResNet34",         "Watertank-Seg",              "mIoU",      "0.638",   "0.748"],
-    ["SegFormer-B2",             "Watertank-Seg",              "mIoU",      "0.658",   "0.748"],
+    ["ResNet-50 Classification", "Watertank-Cropped (10 cls), scratch",  "Top-1 Acc", _acc("resnet50_scratch"), "—"],
+    ["ResNet-50 Classification", "Watertank-Cropped (10 cls), transfer", "Top-1 Acc", _acc("resnet50_transfer"), "—"],
+    ["ResNet-50 Classification", "Turntable-Cropped (18 cls)",           "Top-1 Acc", _acc("resnet50_turntable_pretrain"), "—"],
+    ["YOLOv8m Detection",        "Watertank-Seg",              "mAP50",     f"{_m_pc.box.map50:.3f}",   "—"],
+    ["YOLOv8m Detection",        "Watertank-Seg",              "mAP50-95",  f"{_m_pc.box.map:.3f}",     "—"],
+    ["U-Net + ResNet34",         "Watertank-Seg",              "mIoU (preliminary, see Limitations)",      "0.638",   "0.748"],
+    ["SegFormer-B2",             "Watertank-Seg",              "mIoU (preliminary, see Limitations)",      "0.658",   "0.748"],
 ]
 col_labels = ["Model", "Dataset", "Metric", "Ours", "Paper Baseline"]
-colors = [["#E8F5E9"] * 5] * 2 + [["#E3F2FD"] * 5] * 2 + [["#FFF3E0"] * 5] * 2
+colors = [["#E8F5E9"] * 5] * 3 + [["#E3F2FD"] * 5] * 2 + [["#FFF3E0"] * 5] * 2
 
 table = ax.table(
     cellText=table_data,

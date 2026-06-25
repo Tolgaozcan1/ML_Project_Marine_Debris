@@ -8,6 +8,7 @@ Three concrete datasets, all reading PNG files from disk:
 """
 
 import os
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Callable, Tuple, List
@@ -62,19 +63,24 @@ class FLSClassificationDataset(Dataset):
       - watertank-cropped/   (10 classes)
 
     Args:
-        root        : path to the dataset root folder (e.g. "turntable-cropped/")
-        split       : "train" | "val" | "test"
-        val_ratio   : fraction for validation (default 0.15)
-        test_ratio  : fraction for test      (default 0.15)
-        seed        : random seed for reproducible splits
-        transform   : optional callable applied to the [3,H,W] float tensor
-        img_size    : resize target (square) after CLAHE, default 224
+        root           : path to the dataset root folder (e.g. "turntable-cropped/")
+        split          : "train" | "val" | "test"
+        val_ratio      : fraction for validation (default 0.15)
+        test_ratio     : fraction for test      (default 0.15)
+        seed           : random seed for reproducible splits
+        transform      : optional callable applied to the [3,H,W] float tensor
+        img_size       : resize target (square) after CLAHE, default 224
+        split_strategy : "random" (default, image-level stratified split) or
+                         "blocked" (approximate leakage-safe split, see
+                         _blocked_split below)
+        block_size     : contiguous-frame block size used by "blocked"
     """
 
     def __init__(self, root: str, split: str = "train",
                  val_ratio: float = 0.15, test_ratio: float = 0.15,
                  seed: int = 42, transform: Optional[Callable] = None,
-                 img_size: int = 224):
+                 img_size: int = 224, split_strategy: str = "random",
+                 block_size: int = 15):
         self.root = Path(root)
         self.split = split
         self.transform = transform
@@ -82,9 +88,14 @@ class FLSClassificationDataset(Dataset):
 
         self.classes = sorted(
             d.name for d in self.root.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
+            if d.is_dir() and not d.name.startswith(".") and next(d.glob("*.png"), None) is not None
         )
         self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
+
+        if split_strategy == "blocked":
+            self.paths, self.labels = self._blocked_split(
+                val_ratio, test_ratio, seed, block_size, split)
+            return
 
         all_paths, all_labels = [], []
         for cls in self.classes:
@@ -109,6 +120,41 @@ class FLSClassificationDataset(Dataset):
         chosen = split_map[split]
         self.paths  = [all_paths[i]  for i in chosen]
         self.labels = [all_labels[i] for i in chosen]
+
+    def _blocked_split(self, val_ratio: float, test_ratio: float, seed: int,
+                        block_size: int, split: str) -> Tuple[List[str], List[int]]:
+        """
+        Approximate object/session-grouped split. The released dataset encodes
+        no object or session ID in its filenames, but frames within a class are
+        sequentially numbered (turntable rotation frames, watertank video
+        frames), so adjacent frames are near-duplicate views of the same
+        physical object. Chunking into contiguous blocks and splitting at the
+        block level (instead of shuffling individual frames) keeps
+        near-duplicates on the same side of the split, which is the actual
+        leakage vector in the random image-level split above.
+        """
+        rng = np.random.RandomState(seed)
+        paths, labels = [], []
+        for cls in self.classes:
+            cls_dir = self.root / cls
+            files = list(cls_dir.glob("*.png"))
+            files.sort(key=lambda f: int(re.search(r"(\d+)$", f.stem).group(1)))
+
+            blocks = [files[i:i + block_size] for i in range(0, len(files), block_size)]
+            order = rng.permutation(len(blocks))
+
+            n_test = max(1, round(len(blocks) * test_ratio))
+            n_val = max(1, round(len(blocks) * val_ratio))
+            block_map = {
+                "test": order[:n_test],
+                "val": order[n_test:n_test + n_val],
+                "train": order[n_test + n_val:],
+            }
+            for b in block_map[split]:
+                for f in blocks[b]:
+                    paths.append(str(f))
+                    labels.append(self.class_to_idx[cls])
+        return paths, labels
 
     def __len__(self) -> int:
         return len(self.paths)

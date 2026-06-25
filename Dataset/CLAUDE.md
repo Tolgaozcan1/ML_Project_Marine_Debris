@@ -30,13 +30,20 @@ Last updated: June 2026
 - Debris-only imbalance confirmed: **13× tire vs standing-bottle**
 
 ### Phase 3 — Classification ✅
-- ResNet-50 — Watertank-Cropped: **val acc = 100.00%** (355/355)
-- ResNet-50 — Turntable-Cropped: **val acc = 99.19%** (736/742)
-- Checkpoints: `results/cls_watertank_best.pt`, `results/cls_turntable_best.pt`
+- Live-recomputed (`train_classifier.py`, see `results/classification/classification_runs.json`):
+  ResNet-50 scratch — Watertank-Cropped: **test acc = 98.59%**; transfer (Turntable&rarr;Watertank): **98.87%**;
+  ResNet-50 scratch — Turntable-Cropped: **test acc = 86.39%** (random split — same pipeline, ~12pts below
+  the old undocumented checkpoint's 99.19%/98.38%, evidence of leakage risk in the random image-level split).
+- `--leakage_safe` flag on `train_classifier.py` reruns all stages under an approximate, leakage-reducing
+  contiguous-block split (`src/datasets.py` `split_strategy="blocked"`); results saved under `*_blocked` keys
+  in the same JSON, reported side by side in the report (see `Clean_Academic_Report.pdf` §4.1/§5.6).
+- Old checkpoints (`results/cls_watertank_best.pt`, `results/cls_turntable_best.pt`) are from a lost training
+  script — undocumented config, kept only for historical confusion-matrix figures.
 
 ### Phase 4 — Detection ✅
 - Trained on Kaggle T4 GPU (MPS bincount bug prevented local training)
-- YOLOv8m — 80 epochs — **mAP50 = 0.967**, mAP50-95 = 0.702
+- YOLOv8m — 80 epochs — live-recomputed via `.val()` on saved checkpoint: **mAP50 = 0.937**, mAP50-95 = 0.697
+  (an older training-time log reported 0.967; that figure is no longer cited anywhere in the report)
 - Training time: 1.072 hours
 - Weights: `../Kaggle outputs/yolov8m.pt` (52 MB)
 - MPS fix: `run_yolo_resume.py` monkey-patches `v8DetectionLoss.preprocess` so `counts.max()` runs on CPU
@@ -62,17 +69,18 @@ Last updated: June 2026
 
 | Task | Model | Dataset | Metric | Score | Notes |
 |---|---|---|---|---|---|
-| Classification | ResNet-50 | Watertank-Cropped (10 cls) | top-1 acc | **100.00%** | 355/355 val |
-| Classification | ResNet-50 | Turntable-Cropped (18 cls) | top-1 acc | **99.19%** | 736/742 val |
-| Detection | YOLOv8m | Watertank-Seg | mAP50 | **0.967** | beats published research |
-| Detection | YOLOv8m | Watertank-Seg | mAP50-95 | 0.702 | |
-| Segmentation | U-Net + ResNet34 | Watertank-Seg | mIoU (cls 1–10) | **0.638** | paper baseline: 0.748 |
-| Segmentation | SegFormer-B2 | Watertank-Seg | mIoU (cls 1–10) | **0.658** | 30 epochs Kaggle T4 |
+| Classification | ResNet-50 (scratch) | Watertank-Cropped (10 cls) | test acc | **98.59%** | random split; live-recomputed |
+| Classification | ResNet-50 (transfer) | Watertank-Cropped (10 cls) | test acc | **98.87%** | random split; live-recomputed |
+| Classification | ResNet-50 (scratch) | Turntable-Cropped (18 cls) | test acc | **86.39%** | random split; live-recomputed |
+| Detection | YOLOv8m | Watertank-Seg | mAP50 | **0.937** | live-recomputed from saved checkpoint |
+| Detection | YOLOv8m | Watertank-Seg | mAP50-95 | 0.697 | |
+| Segmentation (preliminary) | U-Net + ResNet34 | Watertank-Seg | mIoU (cls 1–10) | **0.638** | paper baseline 0.748; not reproducible, see Known Issues |
+| Segmentation (preliminary) | SegFormer-B2 | Watertank-Seg | mIoU (cls 1–10) | **0.658** | 30 epochs Kaggle T4; not reproducible |
 
-### YOLOv8m Per-Class mAP50
-| hook | shampoo-bottle | standing-bottle | tire | drink-carton | propeller | bottle | chain | valve | can |
+### YOLOv8m Per-Class mAP50 (live-recomputed, same checkpoint as aggregate above)
+| hook | tire | bottle | chain | drink-carton | propeller | standing-bottle | shampoo-bottle | can | valve |
 |---|---|---|---|---|---|---|---|---|---|
-| 0.995 | 0.995 | 0.995 | 0.989 | 0.984 | 0.975 | 0.968 | 0.964 | 0.914 | 0.891 |
+| 0.995 | 0.994 | 0.989 | 0.984 | 0.984 | 0.945 | 0.913 | 0.866 | 0.855 | 0.848 |
 
 ---
 

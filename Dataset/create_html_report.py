@@ -22,6 +22,27 @@ DATA_ROOT = BASE / "marine-debris-fls-datasets" / "md_fls_dataset" / "data"
 OUT_PDF   = BASE / "results" / "Clean_Academic_Report.pdf"
 FIGURES.mkdir(parents=True, exist_ok=True)
 
+# ── live classification run data (random split + blocked/leakage-safe split) ──
+import json as _json
+_CLS_RUNS_PATH = BASE / "results" / "classification" / "classification_runs.json"
+_cls_runs = _json.load(open(_CLS_RUNS_PATH)) if _CLS_RUNS_PATH.exists() else {}
+
+
+def _cls_acc(key: str) -> str:
+    return f"{_cls_runs[key]['test_acc']*100:.2f}%" if key in _cls_runs else "pending"
+
+
+def _cls_min(key: str) -> str:
+    return f"{_cls_runs[key]['train_minutes']:.1f}" if key in _cls_runs else "pending"
+
+
+BLOCKED_SCRATCH_WT = _cls_acc("resnet50_scratch_blocked")
+BLOCKED_SCRATCH_WT_MIN = _cls_min("resnet50_scratch_blocked")
+BLOCKED_TRANSFER_WT = _cls_acc("resnet50_transfer_blocked")
+BLOCKED_TRANSFER_WT_MIN = _cls_min("resnet50_transfer_blocked")
+BLOCKED_PRETRAIN_TT = _cls_acc("resnet50_turntable_pretrain_blocked")
+BLOCKED_PRETRAIN_TT_MIN = _cls_min("resnet50_turntable_pretrain_blocked")
+
 
 # ── image helpers ─────────────────────────────────────────────────
 def _png_b64(path: Path) -> str:
@@ -330,6 +351,7 @@ def build_html():
     <tr><td>Classification (baseline)</td><td>Simple CNN, scratch</td><td>76.06% test accuracy</td></tr>
     <tr><td>Classification (Watertank)</td><td>ResNet-50, scratch</td><td class="result-good">98.59% test accuracy</td></tr>
     <tr><td>Classification (cross-domain transfer)</td><td>ResNet-50, Turntable&rarr;Watertank</td><td class="result-good">98.87% test accuracy</td></tr>
+    <tr><td>Classification (Turntable, transfer source domain)</td><td>ResNet-50, scratch</td><td>86.39% test accuracy &mdash; see &sect;4.1 and &sect;5.6 on leakage risk</td></tr>
     <tr><td>Object Detection (baseline)</td><td>YOLOv8n</td><td>mAP50 = 0.927</td></tr>
     <tr><td>Object Detection (main)</td><td>YOLOv8m</td><td class="result-good">mAP50 = 0.937</td></tr>
     <tr><td>Segmentation (CNN)</td><td>U-Net + ResNet34</td><td>mIoU = 0.638 (documented, not independently reproducible &mdash; see &sect;5.6)</td></tr>
@@ -351,10 +373,16 @@ def build_html():
   simple baseline trained under the same protocol as its main model, and every classification/
   detection number in this report is recomputed live from saved checkpoints rather than taken on
   faith. The cross-domain transfer model matches the from-scratch model's accuracy (98.87% vs.
-  98.59%) while converging in roughly 40% less training time. Our main detection model achieves
-  mAP50&nbsp;=&nbsp;0.937, clearly ahead of its own baseline (0.927). Segmentation models achieve
-  mIoU of 0.638 and 0.658 against a published baseline of 0.748, though these particular numbers
-  are documented from training logs rather than independently re-verified in this report &mdash;
+  98.59%) while converging in roughly 40% less training time. The same live-recompute pipeline
+  applied to the Turntable source domain (18 classes) gives a markedly lower 86.39% &mdash; a
+  ~12-point gap from the previously circulated, undocumented 99.19%/98.38% figures for that
+  domain, and itself evidence for the leakage risk in &sect;5.6's random image-level split. To
+  bound that risk, we additionally report results under an approximate, leakage-reduced
+  contiguous-block split (&sect;4.1, &sect;5.6). Our main detection model achieves
+  mAP50&nbsp;=&nbsp;0.937, ahead of its own baseline (0.927) on this dataset &mdash; a result we
+  do not claim generalises beyond this small, low-clutter sonar set. Segmentation models report
+  mIoU of 0.638 and 0.658 against a published baseline of 0.748; these are preliminary figures
+  documented from training logs rather than independently re-verified in this report &mdash;
   see the Limitations section for why. All data were collected with an ARIS Explorer 3000 sonar
   at Heriot-Watt University.
 </div>
@@ -592,12 +620,16 @@ Input size: 512&times;512. Trained for 30 epochs on Kaggle T4 GPU.
 <h2>4.1 Classification Results</h2>
 
 <table>
-  {th("Model", "Dataset", "Test Accuracy", "Training time")}
-  {td("Baseline CNN (scratch)", "Watertank-Cropped", "76.06%", "2.7 min")}
-  {td("ResNet-50 (scratch)", "Watertank-Cropped", "<span class='result-good'>98.59%</span>", "15.9 min")}
-  {td("ResNet-50 (Turntable&rarr;Watertank transfer)", "Watertank-Cropped", "<span class='result-good'>98.87%</span>", "9.8 min")}
-  {td("ResNet-50 (original checkpoint, earlier session)", "Watertank-Cropped", "99.15%", "undocumented")}
-  {td("ResNet-50 (original checkpoint, earlier session)", "Turntable-Cropped", "98.38%", "undocumented")}
+  {th("Model", "Dataset", "Split", "Test Accuracy", "Training time")}
+  {td("Baseline CNN (scratch)", "Watertank-Cropped", "random", "76.06%", "2.7 min")}
+  {td("ResNet-50 (scratch)", "Watertank-Cropped", "random", "<span class='result-good'>98.59%</span>", "15.9 min")}
+  {td("ResNet-50 (Turntable&rarr;Watertank transfer)", "Watertank-Cropped", "random", "<span class='result-good'>98.87%</span>", "9.8 min")}
+  {td("ResNet-50 (scratch, pretrain source)", "Turntable-Cropped", "random", "86.39%", "18.4 min")}
+  {td("ResNet-50 (scratch)", "Watertank-Cropped", "<strong>blocked</strong>", BLOCKED_SCRATCH_WT, f"{BLOCKED_SCRATCH_WT_MIN} min")}
+  {td("ResNet-50 (Turntable&rarr;Watertank transfer)", "Watertank-Cropped", "<strong>blocked</strong>", BLOCKED_TRANSFER_WT, f"{BLOCKED_TRANSFER_WT_MIN} min")}
+  {td("ResNet-50 (scratch, pretrain source)", "Turntable-Cropped", "<strong>blocked</strong>", BLOCKED_PRETRAIN_TT, f"{BLOCKED_PRETRAIN_TT_MIN} min")}
+  {td("ResNet-50 (original checkpoint, earlier session)", "Watertank-Cropped", "random, undocumented", "99.15%", "undocumented")}
+  {td("ResNet-50 (original checkpoint, earlier session)", "Turntable-Cropped", "random, undocumented", "98.38%", "undocumented")}
 </table>
 
 <p>
@@ -606,10 +638,33 @@ gain is attributable to architecture rather than simply "a model was trained." T
 transfer model matches the from-scratch model's accuracy while training in roughly 40% less time
 (9.8 vs. 15.9 minutes, 10 vs. 15 epochs) &mdash; evidence that pretraining on a related sonar
 domain (Turntable) transfers useful features to a target domain with comparatively little data
-(Watertank). All three of the new rows above are recomputed live from saved checkpoints in the
-accompanying notebook, with a fixed seed. The original checkpoints from an earlier session are
-listed for context, but the training script that produced them no longer exists in the project
-history, so their exact configuration (e.g. whether ImageNet pretraining was used) is undocumented.
+(Watertank). All "random"-split rows above are recomputed live from saved checkpoints in the
+accompanying notebook, with a fixed seed. The two "original checkpoint" rows are listed only for
+historical context: the training script that produced them no longer exists in the project
+history, so their configuration (e.g. whether ImageNet pretraining was used) is undocumented, and
+they should not be treated as verified results.
+</p>
+
+<p>
+<strong>Why the Turntable number (86.39%) looks worse than the others.</strong> Every split above,
+including this one, is a random <em>image-level</em> split (&sect;5.6): the dataset's filenames
+carry no object or session ID, so frames of the same physical object can land in both train and
+test. With only 10&ndash;18 physical objects per class typically recorded across many near-duplicate
+frames, this is a real leakage vector, and the 98&ndash;99% Watertank numbers above should be read
+as an <em>upper bound</em> on accuracy on genuinely unseen objects, not a verified floor. The
+86.39% Turntable number is the clearest direct evidence for this: under the exact same live
+pipeline, fixed seed, and architecture used for the 98%+ Watertank numbers, the only thing that
+changed is the dataset &mdash; and it dropped over 12 points. We cannot fully separate how much
+of that gap is leakage in the random split versus genuine domain difficulty (18 fine-grained
+classes vs. 10, different rig), since the original 98.38%/99.19% Turntable run is not reproducible
+either. To bound the risk without the dataset providing object/session metadata, the "blocked"
+rows above use an approximate, leakage-reducing split: frames within each class are sequentially
+numbered (turntable rotation frames, watertank video frames), so adjacent frames are near-duplicate
+views of the same object; chunking them into contiguous blocks and splitting <em>at the block
+level</em> (rather than shuffling individual frames) keeps near-duplicates on the same side of the
+split. This is an approximation, not a true object-grouped split &mdash; block boundaries can still
+straddle a genuine domain change in a recording &mdash; but it directly targets the leakage vector
+the released dataset's filenames don't otherwise let us control for.
 </p>
 
 {fig(FIGURES / "cls_watertank_confusion.png",
@@ -641,31 +696,34 @@ log. (An earlier version of this project's visualisation/evaluation code pointed
 never-fine-tuned COCO-pretrained YOLOv8m checkpoint by mistake, which produced a near-zero score;
 this was found and corrected before the numbers above were computed.) The main model improves on
 its own baseline by a modest but consistent margin on both metrics, isolating the effect of model
-capacity (3.0M vs. 25.8M parameters) under an otherwise identical training pipeline. The single
-most challenging class for both models is <em>can</em>, likely due to its small size and
-cylindrical shape, which overlaps visually with <em>valve</em> and <em>shampoo-bottle</em>.
+capacity (3.0M vs. 25.8M parameters) under an otherwise identical training pipeline. The two most
+challenging classes are <em>valve</em> and <em>can</em>, likely due to their small size and
+shape, which overlaps visually with each other and with <em>shampoo-bottle</em>.
 </p>
 
 <h3>Per-Class Detection Performance (YOLOv8m)</h3>
 <p>
-The per-class breakdown below is from the original training-time validation log (overall
-mAP50&nbsp;=&nbsp;0.967 in that run) and has not been individually recomputed per class in this
-pass &mdash; only the aggregate mAP50/mAP50&ndash;95 figures in the table above were
-independently re-verified live.
+The per-class breakdown below is recomputed live from the same <code>.val()</code> checkpoint
+evaluation used for the aggregate mAP50&nbsp;=&nbsp;0.937 above (it previously came from a
+different, older training-time validation log reporting mAP50&nbsp;=&nbsp;0.967 in that run,
+which is no longer cited). Several classes have single- or low-double-digit test instance
+counts (e.g. 9 standing-bottle, 16 shampoo-bottle) &mdash; with no repeated-seed runs or
+confidence intervals computed, per-class mAP for these classes should be read as noisy, not
+precise.
 </p>
 
 <table>
   {th("Class", "mAP50", "mAP50&ndash;95", "Test instances")}
-  {td("hook",            "0.995", "0.737", "25")}
-  {td("shampoo-bottle",  "0.995", "0.695", "16")}
-  {td("standing-bottle", "0.995", "0.727", "8")}
-  {td("tire",            "0.989", "0.852", "85")}
-  {td("drink-carton",    "0.984", "0.663", "40")}
-  {td("propeller",       "0.975", "0.669", "31")}
-  {td("bottle",          "0.968", "0.753", "71")}
-  {td("chain",           "0.964", "0.704", "49")}
-  {td("valve",           "0.914", "0.689", "34")}
-  {td("<strong>can</strong>", "<strong>0.891</strong>", "<strong>0.535</strong>", "53")}
+  {td("hook",            "0.995", "0.761", "19")}
+  {td("tire",            "0.994", "0.849", "91")}
+  {td("bottle",          "0.989", "0.763", "75")}
+  {td("chain",           "0.984", "0.758", "63")}
+  {td("drink-carton",    "0.984", "0.611", "54")}
+  {td("propeller",       "0.945", "0.643", "27")}
+  {td("standing-bottle", "0.913", "0.735", "9")}
+  {td("shampoo-bottle",  "0.866", "0.663", "16")}
+  {td("can",             "0.855", "0.519", "40")}
+  {td("<strong>valve</strong>", "<strong>0.848</strong>", "<strong>0.667</strong>", "37")}
 </table>
 
 {fig(FIGURES / "yolo_per_class_ap.png",
@@ -678,7 +736,13 @@ independently re-verified live.
      "Each box shows the predicted class and confidence score. "
      "Only detections with confidence &gt; 0.25 are shown.")}
 
-<h2>4.3 Segmentation Results</h2>
+<h2>4.3 Segmentation Results (Preliminary)</h2>
+
+<p>
+<strong>These numbers are preliminary and not independently reproducible</strong> &mdash; no
+surviving checkpoint exists for either model, and the local training logs are incomplete or
+crashed (see &sect;5.6). They are reported as documented, not re-verified.
+</p>
 
 <table>
   {th("Model", "Val mIoU", "Test mIoU", "Published Baseline", "Gap")}
@@ -687,10 +751,11 @@ independently re-verified live.
 </table>
 
 <p>
-SegFormer-B2 outperforms U-Net by 2.0 mIoU points on the test set, consistent with the
-expectation that transformer attention better captures the long-range context needed to
-distinguish debris objects from background.  Both models fall below the published baseline
-of 0.748; reasons are analysed in Section&nbsp;5.
+As documented, SegFormer-B2 outperforms U-Net by 2.0 mIoU points on the test set, which would be
+directionally consistent with transformer attention capturing more long-range context than
+convolution &mdash; but since neither run is reproducible, this is a single undocumented-config
+comparison, not a verified finding. Both models fall below the published baseline of 0.748;
+candidate reasons are analysed in Section&nbsp;5.
 </p>
 
 {fig(p_sfcurve,
@@ -710,7 +775,7 @@ of 0.748; reasons are analysed in Section&nbsp;5.
 <!-- ══ 5. DISCUSSION ════════════════════════════════════════════ -->
 <h1 class="page-break">5. Discussion</h1>
 
-<h2>5.1 Why Classification Achieved Near-Perfect Accuracy</h2>
+<h2>5.1 Why Classification Scores So High on Watertank-Cropped</h2>
 <p>
 The cropped patch datasets present the debris object centred in the frame with minimal
 background clutter. ResNet-50 generalises effectively even when trained from scratch because
@@ -719,7 +784,10 @@ even without colour information. The task is also inherently simpler than detect
 segmentation: a single label is assigned per image rather than per region or per pixel. The
 baseline CNN (76.06%) reaching far below either ResNet-50 variant on the identical task and data
 confirms this isn't simply an easy dataset inflating every model's score &mdash; architecture and
-capacity still matter.
+capacity still matter. That said, the 98&ndash;99% Watertank numbers should be read as an upper
+bound, not a verified floor: &sect;4.1 and &sect;5.6 discuss the random image-level split's
+leakage risk, and the same pipeline scores 12 points lower (86.39%) on Turntable-Cropped under
+an identical protocol.
 </p>
 
 <h2>5.1b Why the Cross-Domain Transfer Model Matches the Scratch Model Faster</h2>
@@ -733,19 +801,24 @@ sonar feature extraction from zero. This is consistent with the transfer model n
 epochs to match what the from-scratch model needed 15 epochs to reach.
 </p>
 
-<h2>5.2 Why Detection Exceeded Published Research</h2>
+<h2>5.2 Why Detection Performed Strongly on This Dataset</h2>
 <p>
 YOLOv8m benefits from large-scale COCO pretraining (a rich prior over object shapes and
 scales), a modern architecture with decoupled detection heads, and Distribution Focal Loss
 (DFL) for sub-pixel box regression. The FLS dataset, while small (~1,300 training images),
 has limited background clutter compared to natural scenes, making generalisation easier.
-Eighty epochs with warm-up and cosine LR annealing were sufficient for convergence.
+Eighty epochs with warm-up and cosine LR annealing were sufficient for convergence. We do not
+read mAP50&nbsp;=&nbsp;0.937 as "beating the field": this is a small, low-clutter, single-domain
+dataset evaluated on a random (not leakage-safe) split with a single seed and no confidence
+intervals, so it is a strong result on this benchmark, not a claim that generalises beyond it.
 </p>
 <p>
-The weakest class is <em>can</em> (mAP50&nbsp;=&nbsp;0.891, mAP50-95&nbsp;=&nbsp;0.535). Its
-cylindrical cross-section in sonar is easily confused with <em>valve</em> and
-<em>shampoo-bottle</em>. This could be addressed with harder augmentations (rotations,
-scale jitter) specifically targeting the can class.
+The two weakest classes are <em>valve</em> (mAP50&nbsp;=&nbsp;0.848) and <em>can</em>
+(mAP50&nbsp;=&nbsp;0.855). Their small, simple cross-sections in sonar are easily confused with
+each other and with <em>shampoo-bottle</em>. This could be addressed with harder augmentations
+(rotations, scale jitter) targeting these classes. Per-class scores for low-instance-count
+classes (e.g. 9 standing-bottle test instances) are especially noisy and should not be
+over-interpreted.
 </p>
 
 <h2>5.3 Why Segmentation is Below the Published Baseline</h2>
@@ -756,8 +829,9 @@ scale jitter) specifically targeting the can class.
   <li><strong>Hardware constraints.</strong> Free-tier Kaggle sessions expire after 12 hours, limiting hyperparameter search and training duration.</li>
 </ol>
 <p>
-Despite these constraints, our SegFormer (0.658) improves upon our U-Net (0.638), confirming
-that transformer-based attention is beneficial for this task.
+Despite these constraints, the documented SegFormer score (0.658) is higher than the documented
+U-Net score (0.638) &mdash; directionally suggestive that transformer-based attention helps on
+this task, but not confirmation, since neither run is independently reproducible (&sect;5.6).
 </p>
 
 <h2>5.4 Challenges Encountered and Solutions</h2>
@@ -777,7 +851,7 @@ that transformer-based attention is beneficial for this task.
   {td("Output", "Class label", "Boxes + class", "Pixel mask", "Pixel mask")}
   {td("Inference speed", "Very fast", "Real-time", "Medium", "Slow")}
   {td("Localisation", "None", "Bounding box", "Pixel-exact", "Pixel-exact")}
-  {td("Our accuracy", "98&ndash;99%", "mAP50 = 0.937", "mIoU = 0.638", "mIoU = 0.658")}
+  {td("Our accuracy", "98&ndash;99% (random split; see &sect;5.6)", "mAP50 = 0.937", "mIoU = 0.638 (preliminary)", "mIoU = 0.658 (preliminary)")}
   {td("Recommended for", "Pre-screening", "Main pipeline", "Detailed mapping", "Post-dive analysis")}
 </table>
 <p>
@@ -793,9 +867,17 @@ limitations are acknowledged rather than fixed:</p>
 <ul>
   <li><strong>Leakage-risk splits.</strong> All three tasks use a stratified <em>random</em>
   train/val/test split at the image level. The released dataset encodes no session/object ID in
-  its filenames (e.g. <code>can-212.png</code>), so a true leakage-safe split &mdash; grouping all
-  frames of the same physical object/recording session together &mdash; is not cheaply derivable
-  from this dataset release. This is a known risk, not something verified absent.</li>
+  its filenames (e.g. <code>can-212.png</code>), so a true object/session-grouped split is not
+  cheaply derivable from this dataset release. We attempted to bound the risk rather than leave
+  it unaddressed: classification filenames within a class <em>are</em> sequentially numbered
+  (turntable rotation frames, watertank video frames), so we built an approximate "blocked" split
+  that chunks each class into contiguous runs of frames and splits at the block level, keeping
+  near-duplicate adjacent frames on the same side (&sect;4.1 reports both splits side by side).
+  This is an approximation, not a verified-clean split &mdash; it cannot fully rule out leakage
+  within a block, and we have no ground truth for how many distinct physical objects exist per
+  class. The clearest evidence the risk is real: the live Turntable accuracy (86.39%, random
+  split, &sect;4.1) is 12 points below the previously circulated, now-undocumented 99.19% figure
+  for the same domain under the identical architecture and seed.</li>
   <li><strong>Segmentation weights are not independently reproducible.</strong> No checkpoint
   survives for either U-Net or SegFormer-B2 (lost when the Kaggle free-tier session expired). The
   local training log for U-Net only records 4 of the claimed 60 epochs; the local SegFormer log
@@ -818,27 +900,34 @@ This project demonstrates that deep learning achieves marine debris detection we
 simple baseline from Forward-Looking Sonar imagery, across complementary tasks:
 </p>
 <ul>
-  <li><strong>Classification</strong> with ResNet-50 reaches 98.59% test accuracy from scratch,
-  clearly ahead of a simple-CNN baseline (76.06%) trained under the same protocol.</li>
+  <li><strong>Classification</strong> with ResNet-50 reaches 98.59% test accuracy from scratch on
+  Watertank-Cropped under a random image-level split, clearly ahead of a simple-CNN baseline
+  (76.06%) trained under the same protocol. The same pipeline scores only 86.39% on
+  Turntable-Cropped, and an approximate leakage-reduced "blocked" split (&sect;4.1, &sect;5.6)
+  gives {BLOCKED_SCRATCH_WT} on Watertank and {BLOCKED_TRANSFER_WT} for the transfer model
+  &mdash; the random-split numbers above should be read as an upper bound, not a verified
+  floor.</li>
   <li><strong>Cross-domain transfer</strong> (Turntable&nbsp;&rarr;&nbsp;Watertank) matches the
   from-scratch model's accuracy (98.87% vs. 98.59%) while converging in roughly 40% less training
   time &mdash; a direct, reproducible answer to whether sonar-domain pretraining helps when
   target-domain data is limited.</li>
   <li><strong>Detection</strong> with YOLOv8m achieves mAP50&nbsp;=&nbsp;0.937, ahead of its own
-  YOLOv8n baseline (0.927) under an otherwise identical pipeline.</li>
-  <li><strong>Segmentation</strong> with SegFormer-B2 (mIoU&nbsp;=&nbsp;0.658) outperforms U-Net
-  (mIoU&nbsp;=&nbsp;0.638) in the original training logs, though neither result was independently
-  re-verified in this pass (see Limitations).</li>
+  YOLOv8n baseline (0.927) under an otherwise identical pipeline, on this small, low-clutter
+  dataset and a single seed (not a claim of beating the field at large).</li>
+  <li><strong>Segmentation (preliminary)</strong> &mdash; SegFormer-B2 (mIoU&nbsp;=&nbsp;0.658)
+  outperforms U-Net (mIoU&nbsp;=&nbsp;0.638) in the original training logs, but neither result is
+  independently reproducible (no surviving checkpoint, incomplete/crashed local logs) and should
+  be treated as documented rather than verified (see Limitations).</li>
 </ul>
 
 <p>
 The results validate the feasibility of equipping AUVs with AI-powered sonar processing for
 autonomous debris detection and mapping, and show that even a modest amount of cross-domain
 sonar data can meaningfully accelerate training on a new target domain. Future work should
-explore: (1) a true leakage-safe, session-grouped split if session metadata becomes available;
-(2) retraining segmentation with full logs and preserved weights; (3) higher-resolution
-segmentation training on the full Kaggle GPU budget; and (4) extending the cross-domain transfer
-idea to optical&ndash;sonar fusion.
+explore: (1) a true object/session-grouped split if session metadata becomes available, refining
+the approximate blocked split used here; (2) retraining segmentation with full logs and preserved
+weights; (3) higher-resolution segmentation training on the full Kaggle GPU budget; and
+(4) extending the cross-domain transfer idea to optical&ndash;sonar fusion.
 </p>
 
 

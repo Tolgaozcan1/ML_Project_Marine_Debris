@@ -160,7 +160,9 @@ from train_classifier import SimpleCNN, make_resnet50, WATERTANK, TURNTABLE
 
 device = get_device()
 wt_test = FLSClassificationDataset(WATERTANK, split="test", seed=42)
+tt_test = FLSClassificationDataset(TURNTABLE, split="test", seed=42)
 n_watertank_cls = len(wt_test.classes)
+n_turntable_cls = len(tt_test.classes)
 
 def test_accuracy(model, ds, device):
     model = model.to(device).eval()
@@ -178,25 +180,76 @@ rows = []
 
 baseline = SimpleCNN(n_watertank_cls)
 baseline.load_state_dict(torch.load(CLS_DIR / "cls_baseline_cnn.pt", map_location="cpu"))
-rows.append(("Baseline CNN (scratch)", test_accuracy(baseline, wt_test, device)))
+rows.append(("Baseline CNN (scratch)", "Watertank", "random", test_accuracy(baseline, wt_test, device)))
 
 scratch = make_resnet50(n_watertank_cls)
 scratch.load_state_dict(torch.load(CLS_DIR / "cls_watertank_resnet50_scratch.pt", map_location="cpu"))
-rows.append(("ResNet-50 (scratch)", test_accuracy(scratch, wt_test, device)))
+rows.append(("ResNet-50 (scratch)", "Watertank", "random", test_accuracy(scratch, wt_test, device)))
 
 transfer = make_resnet50(n_watertank_cls)
 transfer.load_state_dict(torch.load(CLS_DIR / "cls_watertank_resnet50_transfer.pt", map_location="cpu"))
-rows.append(("ResNet-50 (Turntable→Watertank transfer)", test_accuracy(transfer, wt_test, device)))
+rows.append(("ResNet-50 (Turntable→Watertank transfer)", "Watertank", "random", test_accuracy(transfer, wt_test, device)))
+
+# Pretrain-source accuracy on its own domain (18-class Turntable) — this was
+# previously omitted from this table, leaving only an old, undocumented 99.19%/
+# 98.38% checkpoint figure standing uncontextualized. Evaluating it live here
+# surfaces the real number and the leakage evidence it carries (see Limitations).
+turntable_pretrain = make_resnet50(n_turntable_cls)
+turntable_pretrain.load_state_dict(torch.load(CLS_DIR / "cls_turntable_resnet50_pretrain.pt", map_location="cpu"))
+rows.append(("ResNet-50 (scratch, pretrain source)", "Turntable", "random", test_accuracy(turntable_pretrain, tt_test, device)))
 
 # Original reported checkpoints (trained in an earlier session; original training
 # script no longer exists, see Limitations) for context only
 orig_wt = tvm.resnet50(weights=None); orig_wt.fc = torch.nn.Linear(2048, 10)
 orig_wt.load_state_dict(torch.load("results/cls_watertank_best.pt", map_location="cpu", weights_only=False))
-rows.append(("ResNet-50 (original reported checkpoint)", test_accuracy(orig_wt, wt_test, device)))
+rows.append(("ResNet-50 (original checkpoint, undocumented)", "Watertank", "random", test_accuracy(orig_wt, wt_test, device)))
 
-cls_results = pd.DataFrame(rows, columns=["Model", "Watertank Test Accuracy"])
-cls_results["Watertank Test Accuracy"] = (cls_results["Watertank Test Accuracy"] * 100).round(2)
+orig_tt = tvm.resnet50(weights=None); orig_tt.fc = torch.nn.Linear(2048, 18)
+orig_tt.load_state_dict(torch.load("results/cls_turntable_best.pt", map_location="cpu", weights_only=False))
+rows.append(("ResNet-50 (original checkpoint, undocumented)", "Turntable", "random", test_accuracy(orig_tt, tt_test, device)))
+
+cls_results = pd.DataFrame(rows, columns=["Model", "Dataset", "Split", "Test Accuracy"])
+cls_results["Test Accuracy"] = (cls_results["Test Accuracy"] * 100).round(2)
 cls_results
+""")
+
+md("""
+**Why the Turntable number above looks much lower than Watertank.** Every row above is a random
+*image-level* split — the dataset's filenames carry no object/session ID, so frames of the same
+physical object can land in both train and test (see Limitations). Under the identical live
+pipeline and seed used for the 98%+ Watertank numbers, Turntable scores markedly lower — a large
+gap from the previously circulated, now-undocumented 99.19%/98.38% figures for that domain, and
+itself evidence the random split carries real leakage risk. The cell below bounds that risk with
+an approximate, leakage-reducing "blocked" split (`src/datasets.py`, `split_strategy="blocked"`):
+frames within a class are sequentially numbered, so chunking them into contiguous blocks and
+splitting at the block level keeps near-duplicate adjacent frames on the same side of the split.
+""")
+
+code("""
+blocked_rows = []
+
+wt_test_blocked = FLSClassificationDataset(WATERTANK, split="test", seed=42, split_strategy="blocked")
+tt_test_blocked = FLSClassificationDataset(TURNTABLE, split="test", seed=42, split_strategy="blocked")
+
+scratch_b = make_resnet50(n_watertank_cls)
+scratch_b.load_state_dict(torch.load(CLS_DIR / "cls_watertank_resnet50_scratch_blocked.pt", map_location="cpu"))
+blocked_rows.append(("ResNet-50 (scratch)", "Watertank",
+                      test_accuracy(scratch, wt_test, device), test_accuracy(scratch_b, wt_test_blocked, device)))
+
+transfer_b = make_resnet50(n_watertank_cls)
+transfer_b.load_state_dict(torch.load(CLS_DIR / "cls_watertank_resnet50_transfer_blocked.pt", map_location="cpu"))
+blocked_rows.append(("ResNet-50 (Turntable→Watertank transfer)", "Watertank",
+                      test_accuracy(transfer, wt_test, device), test_accuracy(transfer_b, wt_test_blocked, device)))
+
+pretrain_b = make_resnet50(n_turntable_cls)
+pretrain_b.load_state_dict(torch.load(CLS_DIR / "cls_turntable_resnet50_pretrain_blocked.pt", map_location="cpu"))
+blocked_rows.append(("ResNet-50 (scratch, pretrain source)", "Turntable",
+                      test_accuracy(turntable_pretrain, tt_test, device), test_accuracy(pretrain_b, tt_test_blocked, device)))
+
+blocked_results = pd.DataFrame(blocked_rows, columns=["Model", "Dataset", "Random-split Test Acc", "Blocked-split Test Acc"])
+blocked_results["Random-split Test Acc"] = (blocked_results["Random-split Test Acc"] * 100).round(2)
+blocked_results["Blocked-split Test Acc"] = (blocked_results["Blocked-split Test Acc"] * 100).round(2)
+blocked_results
 """)
 
 code("""
@@ -232,7 +285,7 @@ display(Image(filename="results/figures/yolo_per_class_ap.png"))
 """)
 
 md("""
-**Segmentation results** (reported from training logs — not recomputed live, see Limitations):
+**Segmentation results (preliminary)** — reported from training logs, not recomputed live, see Limitations:
 
 | Model | Test mIoU (classes 1–10) | Paper baseline |
 |---|---|---|
@@ -272,7 +325,7 @@ md("""
 
 ### Limitations (acknowledged, not fixed, given the project timeline)
 
-- **Leakage-risk splits:** all three tasks use a stratified **random** train/val/test split at the image level (`sklearn.train_test_split`, `src/datasets.py`). The released dataset files do not encode a session/sequence/object ID in their filenames (e.g. `can-212.png`), so a true leakage-safe split (grouping all frames of the same physical object/recording session together) is not cheaply derivable from this dataset release. This is a known risk the course instructions explicitly warn about, not something we verified is absent.
+- **Leakage-risk splits:** all three tasks use a stratified **random** train/val/test split at the image level (`sklearn.train_test_split`, `src/datasets.py`). The released dataset files do not encode a session/sequence/object ID in their filenames (e.g. `can-212.png`), so a true object/session-grouped split is not cheaply derivable from this dataset release. We did not leave this unaddressed: the "blocked"-split cell above chunks each class's sequentially-numbered frames into contiguous blocks and splits at the block level, keeping near-duplicate adjacent frames together — an approximation, not a verified-clean split. The clearest evidence the risk is real: the live Turntable accuracy above is far below the previously circulated, now-undocumented 99.19%/98.38% figures for the same domain under an identical architecture and seed.
 - **Segmentation weights are not independently reproducible:** no `.pt` checkpoint survives for either U-Net or SegFormer-B2 (lost when the Kaggle free-tier session expired). The local `unet_train.log` only records 4 of the claimed 60 epochs, and `segformer_train.log` only shows a local Apple-Silicon Metal crash (SegFormer was actually trained on Kaggle, whose log was not saved locally). The mIoU numbers above are therefore **documented, not re-verifiable, results** — we did not retrain segmentation in this remediation pass.
 - **No segmentation baseline:** unlike classification and detection, no simple baseline model was trained for segmentation before U-Net/SegFormer, for the same reason as above (retraining segmentation was out of scope for this pass).
 - **Original classification checkpoint provenance is partially unverifiable:** the training script that produced `cls_watertank_best.pt` / `cls_turntable_best.pt` no longer exists, and project documentation disagrees on whether ImageNet pretraining was used. The new `resnet50_scratch` / `resnet50_transfer` runs in this notebook are fully from-scratch, seeded, and reproducible, and are the basis for the Task C transfer claim.
@@ -288,8 +341,9 @@ md("""
 - Deep learning models can classify, detect, and segment marine debris from Forward-Looking Sonar imagery well above a simple baseline on every task we tested — answering the main project question.
 - Classification and detection results are strong and **fully reproducible** in this notebook (live-recomputed test accuracy / mAP50 from saved checkpoints, fixed seeds, no hardcoded numbers).
 - The cross-domain transfer experiment shows pretraining on the Turntable domain before fine-tuning on Watertank changes Watertank test accuracy versus training from scratch with the same seed and epoch budget — see the live comparison table and chart above for the exact numbers from this run.
+- The random-split Watertank numbers (98%+) should be read as an upper bound, not a verified floor: the live Turntable number is far lower under an identical pipeline, and the blocked-split comparison above shows accuracy drops further once near-duplicate frames are kept on one side of the split.
 - Segmentation is the weakest task relative to the published baseline, most plausibly due to class imbalance and training budget — but we are explicit that the segmentation numbers are *documented*, not independently re-verified in this pass.
-- Future work: derive a true leakage-safe (session/object-grouped) split if session metadata becomes available; retrain and save segmentation weights with full logs; extend the cross-domain transfer idea to optical–sonar fusion.
+- Future work: refine the approximate blocked split into a true session/object-grouped split if session metadata becomes available; retrain and save segmentation weights with full logs; extend the cross-domain transfer idea to optical–sonar fusion.
 """)
 
 # ───────────────────────────────────────────────────────────────────────────
