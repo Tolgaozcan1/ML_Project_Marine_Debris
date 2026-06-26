@@ -24,6 +24,21 @@
 
 ---
 
+## Model Comparison — Old vs New (Fair Head-to-Head)
+
+Old models from the project's Keras notebooks were re-implemented in PyTorch and trained under **identical conditions** (same data, same split, same 15 epochs, same optimizer) for a fair comparison.
+
+| Model | Watertank Acc | Turntable Acc | Params | Framework |
+|---|---|---|---|---|
+| SqueezeNet *(old)* | 18.87% | 8.89% | ~1.2M | Keras → PyTorch re-run |
+| ResNet-20 *(old)* | 84.79% | 63.21% | ~270K | Keras → PyTorch re-run |
+| **ResNet-50 (scratch)** *(ours)* | **98.59%** | **86.39%** | 25.6M | PyTorch |
+| **ResNet-50 (transfer)** *(ours)* | **98.87%** | — | 25.6M | PyTorch |
+
+> **Why old notebooks reported higher scores (99%+):** They used different class counts (11–12 vs 10–18), smaller input size (96×96 vs 224×224), 40 epochs vs 15, and likely had data leakage in splits. The re-run above uses identical conditions to our models — the gap is real.
+
+---
+
 ## Pipeline
 
 ```
